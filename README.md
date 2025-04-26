@@ -2,6 +2,10 @@
 
 A Telegram bot that guides users through the car insurance application process, from document verification to policy issuance. Built with Python best practices.
 
+<div align="center">
+  <video src="assets/demo/demo.mp4" controls></video>
+</div>
+
 ## Features
 
 - Interactive Telegram bot interface
@@ -93,6 +97,8 @@ car-insurance-telegram-bot/
 ├── requirements.txt       # Dependencies
 ├── example.env            # Environment variable template
 ├── assets/                # Static assets directory
+│   ├── demo/              # Demo videos
+│   │   └── demo.mp4       # Application demo video
 │   └── examples/          # Example documents
 │       ├── passport.png   # Sample passport document
 │       └── vehicle id.png # Sample vehicle ID document

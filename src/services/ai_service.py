@@ -385,7 +385,7 @@ class AIService:
 
     async def respond(self, user: User, messages: List[Message]):
         if not messages:
-            return "No messages to process."
+            return
 
         chat_id = messages[0].chat.id
         bot = messages[0].bot

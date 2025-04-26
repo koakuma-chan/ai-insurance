@@ -20,6 +20,10 @@ car-insurance-telegram-bot/
 ├── main.py                # Entry point with signal handling
 ├── requirements.txt       # Dependencies
 ├── example.env            # Environment variable template
+├── assets/                # Static assets directory
+│   └── examples/          # Example documents
+│       ├── passport.png   # Sample passport document
+│       └── vehicle id.png # Sample vehicle ID document
 ├── src/
 │   ├── __init__.py        # Package metadata
 │   ├── bot/               # Telegram bot interface

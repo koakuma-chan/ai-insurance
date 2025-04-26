@@ -64,11 +64,3 @@ DATABASE_PATH: str = os.path.join(DATA_DIRECTORY_PATH, DATABASE_FILENAME)
 
 # Max conversation history messages
 MAX_MESSAGES: int = int(os.getenv("MAX_MESSAGES", "64"))
-
-# AI Agent names - make them configurable
-AGENT_NAMES: Dict[str, str] = {
-    "hub": "hub_agent",
-    "document_processor": "document_processor_agent",
-    "price_negotiator": "price_negotiator_agent",
-    "insurance_policy": "insurance_policy_agent",
-}

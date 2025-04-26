@@ -23,7 +23,7 @@ from aiogram import Bot
 from aiogram.types import User, Message
 from mindee import Client, product
 
-from src.config.settings import MINDEE_API_KEY, MINDEE_ACCOUNT_NAME
+from src.config.settings import MINDEE_API_KEY, MINDEE_ACCOUNT_NAME, DEFAULT_MODEL
 from src.services.database import DatabaseService
 
 
@@ -287,7 +287,7 @@ class AIService:
     def _create_insurance_policy_agent(self) -> Agent[AgentContext]:
         return Agent[AgentContext](
             name="insurance_policy_agent",
-            model="gpt-4.1-nano-2025-04-14",
+            model=DEFAULT_MODEL,
             tools=[send_insurance_policy],
             instructions=self._insurance_policy_agent_instructions,
             tool_use_behavior="stop_on_first_tool",
@@ -318,7 +318,7 @@ class AIService:
     def _create_price_negotiator_agent(self) -> Agent[AgentContext]:
         return Agent[AgentContext](
             name="price_negotiator_agent",
-            model="gpt-4.1-nano-2025-04-14",
+            model=DEFAULT_MODEL,
             tools=[get_insurance_price],
             instructions=self._price_negotiator_agent_instructions,
         )
@@ -350,7 +350,7 @@ class AIService:
     def _create_document_processor_agent(self) -> Agent[AgentContext]:
         return Agent[AgentContext](
             name="document_processor_agent",
-            model="gpt-4.1-nano-2025-04-14",
+            model=DEFAULT_MODEL,
             instructions=self._document_processor_agent_instructions,
             tools=[get_data],
             model_settings=ModelSettings(parallel_tool_calls=True),
@@ -379,7 +379,7 @@ class AIService:
     def _create_hub_agent(self) -> Agent[AgentContext]:
         return Agent[AgentContext](
             name="hub_agent",
-            model="gpt-4.1-nano-2025-04-14",
+            model=DEFAULT_MODEL,
             instructions=self._hub_agent_instructions,
         )
 

@@ -23,7 +23,12 @@ from aiogram import Bot
 from aiogram.types import User, Message
 from mindee import Client, product
 
-from src.config.settings import MAX_MESSAGES, MINDEE_API_KEY, MINDEE_ACCOUNT_NAME, DEFAULT_MODEL
+from src.config.settings import (
+    MAX_MESSAGES,
+    MINDEE_API_KEY,
+    MINDEE_ACCOUNT_NAME,
+    DEFAULT_MODEL,
+)
 from src.services.database import DatabaseService
 
 

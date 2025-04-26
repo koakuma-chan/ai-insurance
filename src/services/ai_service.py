@@ -23,7 +23,7 @@ from aiogram import Bot
 from aiogram.types import User, Message
 from mindee import Client, product
 
-from src.config.settings import MINDEE_API_KEY, MINDEE_ACCOUNT_NAME, DEFAULT_MODEL
+from src.config.settings import MAX_MESSAGES, MINDEE_API_KEY, MINDEE_ACCOUNT_NAME, DEFAULT_MODEL
 from src.services.database import DatabaseService
 
 
@@ -231,7 +231,7 @@ State of Illinois.
 
 
 class AIService:
-    def __init__(self, max_messages: int = 64):
+    def __init__(self, max_messages: int = MAX_MESSAGES):
         self.max_messages = max_messages
 
         self.hub_agent = self._create_hub_agent()

@@ -39,19 +39,19 @@ class AgentContext:
     chat_id: int = None
 
 
-@function_tool
-async def get_data(
+async def _process_document(
     ctx: RunContextWrapper[AgentContext], file_id: str, file_type: str
-) -> str:
+) -> tuple[str, dict]:
     """
-    Extracts data from a document or photo and stores it in the context.
-
+    Helper function that processes a document using Mindee API.
+    
     Args:
+        ctx: The runtime context
         file_id: The file_id of the document or photo
         file_type: The type of the file. Either "passport" or "vehicle_id".
-
+        
     Returns:
-        Success message
+        Tuple of (temp_file_name, prediction_dict) or (temp_file_name, error_message)
     """
     # Initialize Mindee client
     mindee_client = Client(api_key=MINDEE_API_KEY)
@@ -89,81 +89,130 @@ async def get_data(
     # Rename the file with proper extension
     os.rename(temp_file_no_ext, temp_file_name)
 
+    prediction_dict = {}
+    
     try:
         # Create source from file path
         file_source = mindee_client.source_from_path(temp_file_name)
 
-        # Process with Mindee API based on file_type
-        prediction_dict = {}
+        # Use a custom endpoint
+        endpoint_name = file_type.lower()
+        custom_endpoint = mindee_client.create_endpoint(
+            account_name=MINDEE_ACCOUNT_NAME,
+            endpoint_name=endpoint_name,
+            version="1",
+        )
 
-        if file_type.lower() == "passport" or file_type.lower() == "vehicle_id":
-            # Use a custom endpoint for passport or vehicle_id
-            endpoint_name = file_type.lower()
-            custom_endpoint = mindee_client.create_endpoint(
-                account_name=MINDEE_ACCOUNT_NAME,
-                endpoint_name=endpoint_name,
-                version="1",
-            )
+        # Use GeneratedV1 for custom endpoints
+        api_response = mindee_client.enqueue_and_parse(
+            product.GeneratedV1, file_source, endpoint=custom_endpoint
+        )
 
-            # Use GeneratedV1 for custom endpoints
-            api_response = mindee_client.enqueue_and_parse(
-                product.GeneratedV1, file_source, endpoint=custom_endpoint
-            )
+        if api_response.document:
+            # Get all available fields from the prediction
+            prediction = api_response.document.inference.prediction
+            for field_name, field_values in prediction.fields.items():
+                prediction_dict[field_name] = field_values.value
+                
+        return temp_file_name, prediction_dict
+                
+    except Exception as e:
+        return temp_file_name, {"error": str(e)}
 
-            if api_response.document:
-                # Get all available fields from the prediction
-                prediction = api_response.document.inference.prediction
-                for field_name, field_values in prediction.fields.items():
-                    prediction_dict[field_name] = field_values.value
-        else:
-            # Unsupported file type
-            return f"<error>Unsupported file type: {file_type}. Must be 'passport' or 'vehicle_id'.</error>"
 
-        # Format data as XML based on file type
-        if file_type.lower() == "passport":
-            # Extract name and date of birth
-            if "name" not in prediction_dict:
-                return "<error>Missing required field: name</error>"
+@function_tool
+async def get_passport_data(
+    ctx: RunContextWrapper[AgentContext], file_id: str
+) -> str:
+    """
+    Extracts data from a passport document or photo.
 
-            if "date_of_birth" not in prediction_dict:
-                return "<error>Missing required field: date_of_birth</error>"
+    Args:
+        file_id: The file_id of the passport document or photo
 
-            name = prediction_dict["name"]
-            date_of_birth = prediction_dict["date_of_birth"]
+    Returns:
+        XML-formatted passport data or error message
+    """
+    temp_file_name = None
+    
+    try:
+        temp_file_name, prediction_dict = await _process_document(ctx, file_id, "passport")
+        
+        # Check if there was an error
+        if "error" in prediction_dict:
+            return f"<error>{prediction_dict['error']}</error>"
+            
+        # Check for required fields
+        if "name" not in prediction_dict:
+            return "<error>Missing required field: name</error>"
 
-            # Format as XML
-            xml_output = f"""<passport_data><name>{name}</name><date_of_birth>{date_of_birth}</date_of_birth></passport_data>"""
+        if "date_of_birth" not in prediction_dict:
+            return "<error>Missing required field: date_of_birth</error>"
 
-            return xml_output
+        # Extract name and date of birth
+        name = prediction_dict["name"]
+        date_of_birth = prediction_dict["date_of_birth"]
 
-        elif file_type.lower() == "vehicle_id":
-            # Check for required fields
-            if "manufacturer" not in prediction_dict:
-                return "<error>Missing required field: manufacturer</error>"
+        # Format as XML
+        xml_output = f"""<passport_data><name>{name}</name><date_of_birth>{date_of_birth}</date_of_birth></passport_data>"""
 
-            if "model" not in prediction_dict:
-                return "<error>Missing required field: model</error>"
-
-            if "owner" not in prediction_dict:
-                return "<error>Missing required field: owner</error>"
-
-            # Extract vehicle manufacturer, model and owner
-            manufacturer = prediction_dict["manufacturer"]
-            model = prediction_dict["model"]
-            owner = prediction_dict["owner"]
-
-            # Format as XML
-            xml_output = f"""<vehicle_data><manufacturer>{manufacturer}</manufacturer><model>{model}</model><owner>{owner}</owner></vehicle_data>"""
-
-            return xml_output
-
-        return "<error>Unsupported document type</error>"
-
+        return xml_output
+        
     except Exception as e:
         return f"<error>{str(e)}</error>"
     finally:
         # Clean up the temporary file
-        if os.path.exists(temp_file_name):
+        if temp_file_name and os.path.exists(temp_file_name):
+            os.unlink(temp_file_name)
+
+
+@function_tool
+async def get_vehicle_data(
+    ctx: RunContextWrapper[AgentContext], file_id: str
+) -> str:
+    """
+    Extracts data from a vehicle identification document or photo.
+
+    Args:
+        file_id: The file_id of the vehicle ID document or photo
+
+    Returns:
+        XML-formatted vehicle data or error message
+    """
+    temp_file_name = None
+    
+    try:
+        temp_file_name, prediction_dict = await _process_document(ctx, file_id, "vehicle_id")
+        
+        # Check if there was an error
+        if "error" in prediction_dict:
+            return f"<error>{prediction_dict['error']}</error>"
+            
+        # Check for required fields
+        if "manufacturer" not in prediction_dict:
+            return "<error>Missing required field: manufacturer</error>"
+
+        if "model" not in prediction_dict:
+            return "<error>Missing required field: model</error>"
+
+        if "owner" not in prediction_dict:
+            return "<error>Missing required field: owner</error>"
+
+        # Extract vehicle manufacturer, model and owner
+        manufacturer = prediction_dict["manufacturer"]
+        model = prediction_dict["model"]
+        owner = prediction_dict["owner"]
+
+        # Format as XML
+        xml_output = f"""<vehicle_data><manufacturer>{manufacturer}</manufacturer><model>{model}</model><owner>{owner}</owner></vehicle_data>"""
+
+        return xml_output
+        
+    except Exception as e:
+        return f"<error>{str(e)}</error>"
+    finally:
+        # Clean up the temporary file
+        if temp_file_name and os.path.exists(temp_file_name):
             os.unlink(temp_file_name)
 
 
@@ -353,12 +402,17 @@ class AIService:
                 "",
                 "---",
                 "## Steps to follow",
-                "1. Request the user to upload two documents: their passport and vehicle identification document. They can either send photos or document files.",
-                "2. Use the get_data tool to extract information from each document or photo individually. Present this information to the user and ask them to confirm its accuracy.",
-                "3. If the user indicates the data is incorrect, ask them to upload the documents again. If the user confirms the data is correct, use the transfer_to_price_negotiator_agent tool.",
+                "1. First, ask the user specifically to upload their passport document only. Clearly indicate this is the first of two required documents.",
+                "2. Use the get_passport_data tool to extract information from the passport. Present this information to the user and ask them to confirm its accuracy.",
+                "3. If the passport data is incorrect, ask them to upload the passport again. If correct, thank them and proceed to the next step.",
+                "4. Next, ask the user specifically to upload their vehicle identification document. Clearly indicate this is the second required document.",
+                "5. Use the get_vehicle_data tool to extract information from the vehicle ID. Present this information to the user and ask them to confirm its accuracy.",
+                "6. If the vehicle ID data is incorrect, ask them to upload the vehicle ID document again. If the user confirms the data is correct, use the transfer_to_price_negotiator_agent tool.",
                 "",
                 "---",
                 "## Guidelines",
+                "- Always process one document at a time to avoid confusion about which document is which.",
+                "- Be very specific about which document you are requesting at each step.",
                 "- For out-of-scope queries, politely explain that you can only assist with car insurance services.",
                 "- If the user wishes to abort or restart the process, use the transfer_to_hub_agent tool.",
                 "- If the user sends attachments, they will appear in an XML tag format. Documents appear as: <attachments><document><file_id>file_id_value</file_id></document></attachments>",
@@ -371,7 +425,7 @@ class AIService:
             name="document_processor_agent",
             model=DEFAULT_MODEL,
             instructions=self._document_processor_agent_instructions,
-            tools=[get_data],
+            tools=[get_passport_data, get_vehicle_data],
             model_settings=ModelSettings(parallel_tool_calls=True),
         )
 

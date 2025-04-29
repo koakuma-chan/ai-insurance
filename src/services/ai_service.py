@@ -169,7 +169,7 @@ async def get_data(
 
 @function_tool
 async def get_insurance_price() -> str:
-    return "100 USD"
+    return "<price>100 USD</price>"
 
 
 @function_tool

@@ -9,7 +9,6 @@ from src.config.settings import (
     MEDIA_GROUP_TIMEOUT,
     DATABASE_PATH,
     DEFAULT_MODEL,
-    AGENT_NAMES,
     MAX_MESSAGES,
 )
 
@@ -22,6 +21,5 @@ __all__ = [
     "MEDIA_GROUP_TIMEOUT",
     "DATABASE_PATH",
     "DEFAULT_MODEL",
-    "AGENT_NAMES",
     "MAX_MESSAGES",
 ]

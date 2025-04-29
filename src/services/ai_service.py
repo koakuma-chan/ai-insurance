@@ -41,14 +41,13 @@ class AgentContext:
 
 @function_tool
 async def get_data(
-    ctx: RunContextWrapper[AgentContext], file_id: str, file_name: str, file_type: str
+    ctx: RunContextWrapper[AgentContext], file_id: str, file_type: str
 ) -> str:
     """
-    Extracts data from a document and stores it in the context.
+    Extracts data from a document or photo and stores it in the context.
 
     Args:
-        file_id: The file_id of the document
-        file_name: Name of the file to use for the temporary file
+        file_id: The file_id of the document or photo
         file_type: The type of the file. Either "passport" or "vehicle_id".
 
     Returns:
@@ -60,22 +59,37 @@ async def get_data(
     # Get bot from context
     bot = ctx.context.bot
 
-    # Create a unique temp file name using the provided file_name
+    # Create a unique temp file name
     import uuid
+    import mimetypes
 
     random_prefix = str(uuid.uuid4())[:8]
 
     # Get directory for temp files
     temp_dir = tempfile.gettempdir()
 
-    # Create the temp file name with random prefix and original filename
-    temp_file_name = os.path.join(temp_dir, f"{random_prefix}_{file_name}")
+    # Download file from Telegram to determine mime type
+    file_info = await bot.get_file(file_id)
+    
+    # Create a temporary file with no extension first
+    temp_file_no_ext = os.path.join(temp_dir, f"{random_prefix}_temp")
+    await bot.download_file(file_info.file_path, destination=temp_file_no_ext)
+    
+    # Determine mime type and appropriate extension
+    import magic
+    mime = magic.Magic(mime=True)
+    mime_type = mime.from_file(temp_file_no_ext)
+    
+    # Get extension from mime type
+    extension = mimetypes.guess_extension(mime_type) or '.unknown'
+    
+    # Create final temp file with proper extension
+    temp_file_name = os.path.join(temp_dir, f"{random_prefix}{extension}")
+    
+    # Rename the file with proper extension
+    os.rename(temp_file_no_ext, temp_file_name)
 
     try:
-        # Download file from Telegram
-        file_info = await bot.get_file(file_id)
-        await bot.download_file(file_info.file_path, destination=temp_file_name)
-
         # Create source from file path
         file_source = mindee_client.source_from_path(temp_file_name)
 
@@ -339,16 +353,16 @@ class AIService:
                 "",
                 "---",
                 "## Steps to follow",
-                "1. Request the user to upload two documents: their passport and vehicle identification document.",
-                "2. After receiving both documents, check that they have valid file extensions. If not, ask the user to rename and reupload the files with proper extensions.",
-                "3. Use the get_data tool to extract information from each document individually. Present this information to the user and ask them to confirm its accuracy.",
-                "4. If the user indicates the data is incorrect, ask them to upload the documents again. If the user confirms the data is correct, use the transfer_to_price_negotiator_agent tool.",
+                "1. Request the user to upload two documents: their passport and vehicle identification document. They can either send photos or document files.",
+                "2. Use the get_data tool to extract information from each document or photo individually. Present this information to the user and ask them to confirm its accuracy.",
+                "3. If the user indicates the data is incorrect, ask them to upload the documents again. If the user confirms the data is correct, use the transfer_to_price_negotiator_agent tool.",
                 "",
                 "---",
                 "## Guidelines",
                 "- For out-of-scope queries, politely explain that you can only assist with car insurance services.",
                 "- If the user wishes to abort or restart the process, use the transfer_to_hub_agent tool.",
-                "- If the user sends attachments, they will appear in an XML tag format like this: <attachments><document><file_id>file_id_value</file_id><file_name>filename.pdf</file_name></document></attachments>",
+                "- If the user sends attachments, they will appear in an XML tag format. Documents appear as: <attachments><document><file_id>file_id_value</file_id></document></attachments>",
+                "- Photos appear as: <attachments><photo><file_id>file_id_value</file_id></photo></attachments>",
             ]
         )
 
@@ -439,24 +453,31 @@ class AIService:
 
         # Merge all messages into one content string
         text_parts = []
-        document_parts = []
+        attachment_parts = []
 
         for message in messages:
             if message.text:
                 text_parts.append(message.text)
 
             if message.document:
-                document_parts.append(
-                    f"<document><file_id>{message.document.file_id}</file_id><file_name>{message.document.file_name}</file_name></document>"
+                attachment_parts.append(
+                    f"<document><file_id>{message.document.file_id}</file_id></document>"
+                )
+                
+            if message.photo:
+                # Use the highest quality photo (last in array)
+                photo = message.photo[-1]
+                attachment_parts.append(
+                    f"<photo><file_id>{photo.file_id}</file_id></photo>"
                 )
 
         merged_text = " ".join(text_parts)
 
-        document_xml = ""
-        if document_parts:
-            document_xml = f"\n<attachments>{' '.join(document_parts)}</attachments>"
+        attachments_xml = ""
+        if attachment_parts:
+            attachments_xml = f"\n<attachments>{' '.join(attachment_parts)}</attachments>"
 
-        content = f"{merged_text}{document_xml}"
+        content = f"{merged_text}{attachments_xml}"
 
         input_list.append({"content": content, "role": "user"})
 
